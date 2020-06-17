@@ -94,7 +94,7 @@ _a_readers = 0
 _a_writers = 0
 
 #_q_readers= int((float(res['globalLock']['currentQueue']['readers'])))
-#_q_writers= int((float(res['globalLock']['currentQueue']['Xwriters'])))
+#_q_writers= int((float(res['globalLock']['currentQueue']['writers'])))
 #_a_readers= int((float(res['globalLock']['activeClients']['readers'])))
 #_a_writers= int((float(res['globalLock']['activeClients']['writers'])))
 
