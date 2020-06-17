@@ -8,9 +8,13 @@ import time
 import subprocess
 import re
 import urllib
+import io
 
-ZBSERVER = 'localhost'
+ZBSERVER = 'nngp005'
 ZBPORT = 10051
+
+#sys.stdout = io.TextIOWrapper(sys.stdout.detach(), encoding = 'utf-8')
+#sys.stderr = io.TextIOWrapper(sys.stderr.detach(), encoding = 'utf-8')
 
 try:
     opts, args = getopt.getopt(sys.argv[1:],"h:n:p:u:s:")
@@ -35,102 +39,27 @@ for opt, arg in opts:
 mongohost = mongohost.rstrip()
 zbhost = zbhost.rstrip()
 
-arg = "-u " + muser + " -p " + mpass + " -h " + mongohost + ":" + mongoport + " --authenticationDatabase=admin --rowcount 1 --noheaders"
-cmd = ['mongostat', "-u", muser, "-p", mpass, "-h", mongohost + ":" + mongoport, "--authenticationDatabase=admin", "--rowcount", "1", "--noheaders"]
-r = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-out, err = r.communicate()
-res = out + err
 
 #print("DEBUG: STR: " + arg)
 #print("DEBUG: RES: " + res)
 #print("DEBUG: ERR: " + err + str(len(err)))
 
 state = 0
-if len(err) > 0:
-    packet = [ ZabbixMetric(zbhost, 'mongos_state', state),
-               ZabbixMetric(zbhost, 'mongos_errstr', err) ]
-    result = ZabbixSender(zabbix_port = ZBPORT, zabbix_server = ZBSERVER).send(packet)
-    print(err)
-    sys.exit(1)
-res = res.rstrip()
-res = res.replace('*','')
-res = re.sub("^ +","",res)
-arr = re.split(" +", res)
-
-def str_to_int(s):
-    m = re.match('(\d+)(\[a-z]|[A-Z])', s)
-    r = re.match('(\d+).(\d+)(\[a-z]|[A-Z])', s)
-    if r:
-        m = r
-    if m:
-        i = int(m.group(1))
-        if m.group(2) == 'k':
-            i = i * 1000
-        elif m.group(2) == 'm':
-            i = i * 1000 * 1000
-    else:
-        try:
-            i = int(s)
-        except:
-            i = 0
-    return i
-
-def str_to_bytes(s):
-    m = re.match('(\d+)(\[a-z]|[A-Z])', s)
-    r = re.match('(\d+).(\d+)(\[a-z]|[A-Z])', s)
-    if r:
-        m = r
-    if m:
-        i = int(m.group(1))
-        if m.group(2) == 'k' or m.group(2) == 'K':
-            i = i * 1024
-        elif m.group(2) == 'm' or m.group(2) == 'M':
-            i = i * 1024 * 1024
-        elif m.group(2) == 'g' or m.group(2) == 'G':
-            i = i * 1024 * 1024 * 1024
-    else:
-        try:
-            i = int(s)
-        except:
-            i = 0
-    return i
-
-if len(arr) < 18:
-    err = 'Unknown error!'
-    packet = [ ZabbixMetric(zbhost, 'mongos_state', state),
-               ZabbixMetric(zbhost, 'mongos_errstr', err) ]
-    result = ZabbixSender(zabbix_port = ZBPORT, zabbix_server = ZBSERVER).send(packet)
-    print(err)
-    sys.exit(1)
-
-# Human readable names for better understanding what do we get and how to deal with it
-insert, query, update, delete, getmore, command, flushes, vsize, resm, flt, qr, ar, netin, netout, conn, rset, repl = arr[:17]
-# Add known opcounters to zabbix packet
-err = 'OK'
-state = 1
-packet = [ ZabbixMetric(zbhost, 'mongos_state', state),
-           ZabbixMetric(zbhost, 'mongos_errstr', err) ]
-conn = str_to_int(conn)
-packet.append(ZabbixMetric(zbhost, "mongos_conn", conn))
-vsize = str_to_bytes(vsize)
-packet.append(ZabbixMetric(zbhost, "mongos_vsize", vsize))
-netin = str_to_bytes(netin)
-packet.append(ZabbixMetric(zbhost, "mongos_netin", netin))
-netout = str_to_bytes(netout)
-packet.append(ZabbixMetric(zbhost, "mongos_netout", netout))
 
 # Read saved opcounters from previous check
 try:
-    f = open("/tmp/" + mongohost + "-mongos-opcounters")
+    #f = open("/tmp/" + mongohost + "-mongos-opcounters")
+    f = open("C:\\Users\\hammer\\" + mongohost + "-mongos-opcounters")
     s = f.read()
     f.close()
-    ts, insert, update, delete, query, getmore, command = s.split(" ")
+    ts, insert, query, update, delete, getmore, command, commandRepl, flushes, vsize, res, q_readers, q_writers, a_readers, a_writers, \
+    net_in, net_out, conn = s.split(" ")
 except Exception as e:
-    ts, insert, update, delete, query, getmore, command = [1,0,0,0,0,0,0]
+    ts, insert, query, update, delete, getmore, command, commandRepl, flushes, vsize, res, q_readers, q_writers, a_readers, a_writers,  net_in, net_out, conn = [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]
     print(e)
 
 print("History opcounters")
-print(ts, insert, update, delete, query, getmore, command)
+print(ts, insert, query, update, delete, getmore, command, commandRepl, flushes, vsize, res, q_readers, q_writers, a_readers, a_writers, net_in, net_out, conn)
 
 # Get serverStatus stats
 try:
@@ -139,29 +68,108 @@ except Exception as e:
     print ('Can\'t connect to '+mongohost)
     print ("ERROR:", e)
     sys.exit(1)
+
 res = mo.admin.command('serverStatus')
 now = time.time()
-#$zab->send("mongos_insert", int(($res->{opcounters}->{insert} - $insert)/(($now-$ts)/60)));
-packet.append(ZabbixMetric(zbhost, "mongos_insert", int((float(res['opcounters']['insert']) - float(insert))/((now - float(ts))/60))))
-packet.append(ZabbixMetric(zbhost, "mongos_update", int((float(res['opcounters']['update']) - float(update))/((now - float(ts))/60))))
-packet.append(ZabbixMetric(zbhost, "mongos_delete", int((float(res['opcounters']['delete']) - float(delete))/((now - float(ts))/60))))
-packet.append(ZabbixMetric(zbhost, "mongos_query", int((float(res['opcounters']['query']) - float(query))/((now - float(ts))/60))))
-packet.append(ZabbixMetric(zbhost, "mongos_getmore", int((float(res['opcounters']['getmore']) - float(getmore))/((now - float(ts))/60))))
-packet.append(ZabbixMetric(zbhost, "mongos_command", int((float(res['opcounters']['command']) - float(command))/((now - float(ts))/60))))
-# Total ops since last run (per minute approx)
-total_ops = res['opcounters']['insert'] + res['opcounters']['update'] + res['opcounters']['delete'] + res['opcounters']['query'] + \
-            res['opcounters']['getmore'] + res['opcounters']['command'] - int(insert) - int(update) - int(delete) - int(query) - int(getmore) - int(command)
-packet.append(ZabbixMetric(zbhost, "mongos_total_ops", total_ops))
+
+_insert  = int((float(res['opcounters']['insert'])))
+_query   = int((float(res['opcounters']['query'])))
+_update  = int((float(res['opcounters']['update'])))
+_delete  = int((float(res['opcounters']['delete'])))
+_getmore = int((float(res['opcounters']['getmore'])))
+_command = int((float(res['opcounters']['command'])))
+
+# not in monogos
+_commandRepl = 0
+# not in monogos
+_flushes = 0
+
+_vsize= int((float(res['mem']['virtual'])))
+_res= int((float(res['mem']['resident'])))
+
+# not in monogos
+_q_readers = 0
+_q_writers = 0
+_a_readers = 0
+_a_writers = 0
+
+#_q_readers= int((float(res['globalLock']['currentQueue']['readers'])))
+#_q_writers= int((float(res['globalLock']['currentQueue']['Xwriters'])))
+#_a_readers= int((float(res['globalLock']['activeClients']['readers'])))
+#_a_writers= int((float(res['globalLock']['activeClients']['writers'])))
+
+_net_in= int((float(res['network']['bytesIn'])))
+_net_out= int((float(res['network']['bytesOut'])))
+
+_conn=int((float(res['connections']['current'])))
+
+insert_  = int((float(_insert) - float(insert))/((now - float(ts))))
+query_   = int((float(_query) - float(query))/((now - float(ts))))
+update_  = int((float(_update) - float(update))/((now - float(ts))))
+delete_  = int((float(_delete) - float(delete))/((now - float(ts))))
+getmore_ = int((float(_getmore) - float(getmore))/((now - float(ts))))
+command_ = int((float(_command) - float(command))/((now - float(ts))))
+commandRepl_ =  int((float(_commandRepl) - float(commandRepl))/((now - float(ts))))
+
+flushes_ =  int(_flushes)
+vsize_   =  int(_vsize)
+res_   =  int(_res)
+
+q_readers_ = int(_q_readers)
+q_writers_ = int(_q_writers)
+a_readers_ = int(_a_readers)
+a_writers_ = int(_a_writers)
+net_in_    = int((float(_net_in) - float(net_in))/((now - float(ts))))
+net_out_   = int((float(_net_out) - float(net_out))/((now - float(ts))))
+conn_      = int(_conn)
 
 # Save opcounters
 try:
-    f = open("/tmp/" + mongohost + "-mongos-opcounters", 'w')
-    f.write(str(int(now)) + ' ' + str(res['opcounters']['insert']) + ' ' + str(res['opcounters']['update']) + ' ' + str(res['opcounters']['delete']) + ' ' + \
-            str(res['opcounters']['query']) + ' ' + str(res['opcounters']['getmore']) + ' ' + str(res['opcounters']['command']))
+    #f = open("/tmp/" + mongohost + "-mongos-opcounters", 'w')
+    f = open("C:\\Users\\hammer\\" + mongohost + "-mongos-opcounters", 'w')
+    f.write(str(int(now)) + ' ' + str(_insert) + ' ' + str(_query) + ' ' + str(_update) + ' ' + \
+            str(_delete) + ' ' + str(_getmore) + ' ' + str(_command) + ' ' + str(_commandRepl) + ' ' +\
+            str(_flushes) + ' ' + str(_vsize) + ' ' + str(_res) + ' ' +\
+            str(_q_readers) + ' ' + str(_q_writers) + ' ' + str(_a_readers) + ' ' + str(_a_writers)  + ' ' +\
+            str(_net_in) + ' ' + str(_net_out) + ' ' + str(_conn)
+            )
     f.close()
 except Exception as e:
     print("Can't update stats!")
     print(e)
 
-t = ZabbixSender(zabbix_port = ZBPORT, zabbix_server = ZBSERVER).send(packet)
+print( insert_, query_, update_, delete_, getmore_, command_, commandRepl_, flushes_, vsize_, res_, q_readers_, q_writers_, a_readers_, a_writers_, net_in_, net_out_, conn_)
+
+err = 'OK'
+state = 1
+
+packet = [ ZabbixMetric(zbhost, 'mongos_state', state),
+           ZabbixMetric(zbhost, 'mongos_errstr', err) ]
+
+packet.append(ZabbixMetric(zbhost, "mongos_insert", int(insert_)))
+packet.append(ZabbixMetric(zbhost, "mongos_query", int(query_)))
+packet.append(ZabbixMetric(zbhost, "mongos_update", int(update_)))
+packet.append(ZabbixMetric(zbhost, "mongos_delete", int(delete_)))
+packet.append(ZabbixMetric(zbhost, "mongos_getmore", int(getmore_)))
+packet.append(ZabbixMetric(zbhost, "mongos_command", int(command_)))
+packet.append(ZabbixMetric(zbhost, "mongos_commandRepl", int(commandRepl_)))
+packet.append(ZabbixMetric(zbhost, "mongos_insert", int(flushes_)))
+packet.append(ZabbixMetric(zbhost, "mongos_insert", int(vsize_)))
+packet.append(ZabbixMetric(zbhost, "mongos_insert", int(res_)))
+packet.append(ZabbixMetric(zbhost, "mongos_insert", int(q_readers_)))
+packet.append(ZabbixMetric(zbhost, "mongos_insert", int(q_writers_)))
+packet.append(ZabbixMetric(zbhost, "mongos_insert", int(a_readers_)))
+packet.append(ZabbixMetric(zbhost, "mongos_insert", int(a_writers_)))
+packet.append(ZabbixMetric(zbhost, "mongos_netin", int(net_in_)))
+packet.append(ZabbixMetric(zbhost, "mongos_netout", int(net_out_)))
+packet.append(ZabbixMetric(zbhost, "mongos_conn", int(conn_)))
+packet.append(ZabbixMetric(zbhost, "mongos_total_ops", int(0)))
+
+try:
+    t = ZabbixSender(zabbix_port = ZBPORT, zabbix_server = ZBSERVER).send(packet)
+except Exception as e:
+    print("Can't send daat to zabbix server")
+    print(e)
+    sys.exit(1)
+
 print(t)
