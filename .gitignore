@@ -125,3 +125,9 @@ dmypy.json
 .pyre/
 
 /.idea/vcs.xml
+.idea/inspectionProfiles/
+.idea/misc.xml
+.idea/modules.xml
+.idea/workspace.xml
+.idea/zabbix-template.iml
+mongodb-4.0.x/mongos-back.py
