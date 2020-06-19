@@ -21,7 +21,7 @@ os_ = platform.system()
 
 #print(" TEMP = " + os.environ["TEMP"])
 
-
+# mongostat -u root -p aimiramm --authenticationDatabase admin --rowcount 1 --noheaders
 
 #sys.stdout = io.TextIOWrapper(sys.stdout.detach(), encoding = 'utf-8')
 #sys.stderr = io.TextIOWrapper(sys.stderr.detach(), encoding = 'utf-8')
@@ -58,8 +58,8 @@ state = 0
 
 # Read saved opcounters from previous check
 try:
-    temp_dir = os.environ["TEMP"]
     if os_ == "Windows":
+        temp_dir = os.environ["TEMP"]
         #f = open("C:\\Users\\hammer\\" + mongohost + "-mongos-opcounters")
         f = open(temp_dir + "\\" + mongohost + "-mongos-opcounters")
     elif os_ == "Linux":
@@ -68,13 +68,13 @@ try:
     s = f.read()
     f.close()
     ts, _insert, _query, _update, _delete, _getmore, _command, _commandRepl, _flushes, _vsize, _rsize, _q_readers, _q_writers, _a_readers, _a_writers, \
-    _net_in, _net_out, _conn = s.split(" ")
+    _net_in, _net_out, _conn, _connAvail = s.split(" ")
 except Exception as e:
-    ts, _insert, _query, _update, _delete, _getmore, _command, _commandRepl, _flushes, _vsize, _rsize, _q_readers, _q_writers, _a_readers, _a_writers,  _net_in, _net_out, _conn = [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]
+    ts, _insert, _query, _update, _delete, _getmore, _command, _commandRepl, _flushes, _vsize, _rsize, _q_readers, _q_writers, _a_readers, _a_writers,  _net_in, _net_out, _conn, _connAvail = [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]
     print(e)
 
 print("History opcounters")
-print(ts, _insert, _query, _update, _delete, _getmore, _command, _commandRepl, _flushes, _vsize, _rsize, _q_readers, _q_writers, _a_readers, _a_writers, _net_in, _net_out, _conn)
+print(ts, _insert, _query, _update, _delete, _getmore, _command, _commandRepl, _flushes, _vsize, _rsize, _q_readers, _q_writers, _a_readers, _a_writers, _net_in, _net_out, _conn, _connAvail)
 
 # Get serverStatus stats
 try:
@@ -116,7 +116,8 @@ a_writers = 0
 net_in= int((float(res['network']['bytesIn'])))
 net_out= int((float(res['network']['bytesOut'])))
 
-conn=int((float(res['connections']['current'])))
+conn      = int((float(res['connections']['current'])))
+connAvail = int((float(res['connections']['available'])))
 
 insert_  = int((float(insert) - float(_insert))/((now - float(ts))))
 query_   = int((float(query) - float(_query))/((now - float(ts))))
@@ -139,7 +140,7 @@ a_writers_ = int(a_writers)
 net_in_    = int((float(net_in) - float(_net_in))/((now - float(ts))))
 net_out_   = int((float(net_out) - float(_net_out))/((now - float(ts))))
 conn_      = int(conn)
-
+connAvail_ = int(connAvail)
 # Save opcounters
 try:
     if os_ == "Windows":
@@ -153,7 +154,7 @@ try:
             str(delete) + ' ' + str(getmore) + ' ' + str(command) + ' ' + str(commandRepl) + ' ' +\
             str(flushes) + ' ' + str(vsize) + ' ' + str(rsize) + ' ' +\
             str(q_readers) + ' ' + str(q_writers) + ' ' + str(a_readers) + ' ' + str(a_writers)  + ' ' +\
-            str(net_in) + ' ' + str(net_out) + ' ' + str(conn)
+            str(net_in) + ' ' + str(net_out) + ' ' + str(conn)+ ' ' + str(connAvail)
             )
     f.close()
 except Exception as e:
@@ -162,7 +163,7 @@ except Exception as e:
     sys.exit(1)
 
 mongos_total_ops = int(insert_) + int(query_) + int(update_) + int(delete_) + int(getmore_) + int(command_)
-print( insert_, query_, update_, delete_, getmore_, command_, commandRepl_, flushes_, vsize_, rsize_, q_readers_, q_writers_, a_readers_, a_writers_, net_in_, net_out_, conn_)
+print( insert_, query_, update_, delete_, getmore_, command_, commandRepl_, flushes_, vsize_, rsize_, q_readers_, q_writers_, a_readers_, a_writers_, net_in_, net_out_, conn_, connAvail_)
 
 #mongos_total_ops=0
 err = 'OK'
@@ -188,8 +189,9 @@ packet.append(ZabbixMetric(zbhost, "mongos_aWriters", int(a_writers_)))
 packet.append(ZabbixMetric(zbhost, "mongos_netin", int(net_in_)))
 packet.append(ZabbixMetric(zbhost, "mongos_netout", int(net_out_)))
 packet.append(ZabbixMetric(zbhost, "mongos_conn", int(conn_)))
+packet.append(ZabbixMetric(zbhost, "mongos_connAvail", int(connAvail_)))
 packet.append(ZabbixMetric(zbhost, "mongos_total_ops", int(mongos_total_ops)))
-
+"""
 try:
     t = ZabbixSender(zabbix_port = ZBPORT, zabbix_server = ZBSERVER).send(packet)
 except Exception as e:
@@ -198,3 +200,4 @@ except Exception as e:
     sys.exit(1)
 
 print(t)
+"""

@@ -1,5 +1,10 @@
 #!/usr/bin/python
 #
+
+"""
+This is for mongo config server.
+"""
+
 from __future__ import print_function
 import sys, getopt
 from pyzabbix import ZabbixMetric, ZabbixSender
